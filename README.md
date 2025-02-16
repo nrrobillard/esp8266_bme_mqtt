@@ -1,5 +1,14 @@
 # esp8266_bme_mqtt
 
+## Setup
+Create a config.h file
+```
+#define MQTT_USERNAME <your MQTT username>
+#define MQTT_PASSWORD <your MQTT password>
+#define MQTT_IP <your MQTT broker IP address>
+#define SENSOR_NAME <your sensor name>
+```
+
 ## Building
 ### Install arduino-cli
 Run the following with Git Bash
