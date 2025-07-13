@@ -16,7 +16,7 @@
 
 // MQTT Broker
 const char *mqtt_broker = MQTT_IP; // Enter mqtt server WiFi or Ethernet IP
-const char *topic = "test";
+//const char *topic = "test";
 const int mqtt_port = 1883;
 const char* mqtt_username = MQTT_USERNAME;
 const char* mqtt_password = MQTT_PASSWORD;
@@ -27,7 +27,7 @@ const char* sensor_name = SENSOR_NAME;
 WiFiClient espClient;
 PubSubClient client(espClient);
 Adafruit_BME280 bme; // I2C
-unsigned long delayTime; // delay between BME queries
+unsigned long delayTime = 1000; // delay between BME queries
 
 void setup() 
 {
@@ -37,6 +37,7 @@ void setup()
     // Initialize random seed for random values generated below
     randomSeed(analogRead(0));
 
+    // start up wifi manager - this is a tool that lets the user enter their wifi info through a web page
     WiFiManager wm;
     // wm.resetSettings(); // clears saved wifi settings. for testing
     bool res;
@@ -54,12 +55,32 @@ void setup()
     }
 
 
-
     Serial.println("Connecting to mqtt broker");
     //connecting to a mqtt broker
     client.setServer(mqtt_broker, mqtt_port);
-    // client.setCallback(callback);
+    connectToMQTTServer(mqtt_username, mqtt_password);
+       
+
+    Serial.println("Connecting to BME sensor");
+    unsigned status; // BME status
+    // default settings
+    status = bme.begin();  
+    // You can also pass in a Wire library object like &Wire2
+    // status = bme.begin(0x76, &Wire2)
+    if (!status) {
+        Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+        Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+        Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+        Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+        Serial.print("        ID of 0x60 represents a BME 280.\n");
+        Serial.print("        ID of 0x61 represents a BME 680.\n");
+        while (1) delay(10);
+      }
+
  
+}
+
+void connectToMQTTServer(const char* mqtt_username, const char* mqtt_password) {
     while (!client.connected()) 
     {
         String client_id = "esp8266-client-";
@@ -76,62 +97,18 @@ void setup()
             Serial.print(client.state());
             delay(2000);
         }
-
-        Serial.println("Connecting to BME sensor");
-        unsigned status; // BME status
-        // default settings
-        status = bme.begin();  
-        // You can also pass in a Wire library object like &Wire2
-        // status = bme.begin(0x76, &Wire2)
-        if (!status) {
-            Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
-            Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
-            Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
-            Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
-            Serial.print("        ID of 0x60 represents a BME 280.\n");
-            Serial.print("        ID of 0x61 represents a BME 680.\n");
-            while (1) delay(10);
-        }
-
-        delayTime = 1000;
     }
- 
-    // only publish for now
-    Serial.println("Sending message");
-    client.publish(topic, "Hello From ESP8266!");
-    Serial.println("Successfully published");
-    // client.subscribe(topic);
-    // Serial.println("Successfully subscribed!");
 }
 
 
-//void callback(char *topic, byte *payload, unsigned int length) {
-// Serial.print("Message arrived in topic: ");
-// Serial.println(topic);
-// Serial.print("Message:");
-// 
-// for (int i = 0; i < length; i++) {
-//  Serial.print((char) payload[i]);
-// }
-// 
-// Serial.println();
-// Serial.println(" - - - - - - - - - - - -");
-//}
 
-
-int i = 0;
 void loop() {
     Serial.println("Starting loop");
+    Serial.println("Reconnecting to mqtt server if needed.");
+    connectToMQTTServer(mqtt_username, mqtt_password);
     client.loop();
-    Serial.println("generating payload");
 
-    char message[2];
-    itoa(random(100), message, 10);
-    Serial.println("About to publish");
-    Serial.println(message);
-    client.publish(topic, message);
-    Serial.println("Just published");
-
+ 
     // read and publish temperature
     float temperature_degC = bme.readTemperature();
     char temperature_buffer[10];
@@ -145,8 +122,6 @@ void loop() {
     Serial.print("publishing to ");
     Serial.println(temperature_degC_topic_buffer);
     client.publish(temperature_degC_topic_buffer,temperature_buffer);
-
-
 
     // read and publish humidity
     float humidity_pct = bme.readHumidity();
@@ -175,30 +150,6 @@ void loop() {
     Serial.print("publishing to ");
     Serial.println(pressure_hpa_topic_buffer);
     client.publish(pressure_hpa_topic_buffer, pressure_buffer);
- 
-    i++;
-    // printValues();
+
     delay(delayTime);
-}
-
-
-void printValues() {
-    Serial.print("Temperature = ");
-    Serial.print(bme.readTemperature());
-    Serial.println(" °C");
-
-    Serial.print("Pressure = ");
-
-    Serial.print(bme.readPressure() / 100.0F);
-    Serial.println(" hPa");
-
-    Serial.print("Approx. Altitude = ");
-    Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-    Serial.println(" m");
-
-    Serial.print("Humidity = ");
-    Serial.print(bme.readHumidity());
-    Serial.println(" %");
-
-    Serial.println();
 }
